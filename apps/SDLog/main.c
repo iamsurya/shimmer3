@@ -210,7 +210,7 @@ struct{  uint8_t idx;   uint8_t entry[ CBUF_SIZE ];}ucBuf;
 
 uint16_t bmpTempInterval, bmpPresInterval;
 uint16_t taskList, taskCurrent;
-uint16_t dirCounter, blinkCnt20, blinkCnt50, sdBuffLen, blockLen, fileNum, rcommCnt, rcommIntervalCenter,
+uint16_t dirCounter, blinkCnt5, blinkCnt20, blinkCnt50, blinkCnt100, sdBuffLen, blockLen, fileNum, rcommCnt, rcommIntervalCenter,
          rcommSpecialInt, uartDcMemLength, uartDcMemOffset, uartInfoMemOffset, lastGsrVal,
          syncCurrNodeExpire, syncNodeWinExpire;
 uint16_t *adcStartPtr;
@@ -236,6 +236,9 @@ FIL dataFil;
 float clockFreq;
 
 #define TESTDOCK 0
+
+uint8_t blinkTimes = 0;
+uint8_t YellowBlink = 0;
 
 void main(void) {
    // first/second MPL library callback fails if system_pre_init.c is used
@@ -279,11 +282,14 @@ void main(void) {
          RcNodeR10();
       }
       if(taskCurrent == TASK_STOPSENSING){
-         if(sensing)
-            StopStreaming();
+         if(sensing){
+             StopStreaming();
+             YellowBlink = 0;
+         }
       }
       if(taskCurrent == TASK_STARTSENSING){
          configuring = 1;
+         blinkTimes = 0;
          PreStartStreaming();
          StartStreaming();
          if(sdHeadText[SDH_TRIAL_CONFIG0]&SDH_TIME_SYNC){
@@ -374,8 +380,10 @@ void Init(void) {
    battRead = 1;
    battWait = 0;
    battStat = 0;
+   blinkCnt5 = 0;
    blinkCnt20 = 0;
    blinkCnt50 = 0;
+   blinkCnt100 = 0;
    fileBad = 0;
    btBad = 0;
    rcommSpecialInt = 0;
@@ -823,6 +831,7 @@ void StartStreaming(void) {
 
 inline void StopStreaming(void) {
    configuring = 1;
+
    if(storedConfig[NV_CONFIG_SETUP_BYTE4] & MPU9150_MPL_DMP) {
       MPU_saveCalibration();
       MPL_saveCalibrationBytes();
@@ -888,6 +897,7 @@ inline void StopStreaming(void) {
    TaskClear(TASK_SAMPLEBMP180PRESS);
    RcStop();
    configuring = 0;
+
 }
 
 
@@ -1639,11 +1649,22 @@ __interrupt void TIMER0_B1_ISR(void)
     case  6:                                    // TB0CCR3
        // for LED blink usage details, please check shimmer user manual
       TB0CCR3 += clk_1000;
+
+      if(blinkCnt100++==99)
+         blinkCnt100 = 0;
+
       if(blinkCnt50++==49)
          blinkCnt50 = 0;
 
       if(blinkCnt20++==19)
          blinkCnt20 = 0;
+
+      if(blinkCnt5++==4)
+         blinkCnt5 = 0;
+
+      if(YellowBlink<6) YellowBlink++;
+
+
 
       uint64_t batt_td, batt_my_local_time_64;
       batt_my_local_time_64 = RTC_get64();
@@ -1657,14 +1678,15 @@ __interrupt void TIMER0_B1_ISR(void)
 
       if(blinkStatus){
          // below are settings for green0, yellow and red leds, battery charge status
-         if(docked){
+
+    	  /* if(docked){ // I don't need no blinky lights when I'm docked. The dock has lights for that.
             BattBlinkOn();
          }else{
-            if(!blinkCnt50)
+            /* if(!blinkCnt50) // this code can go because we don't want any LED when the device is not sensing.
                BattBlinkOn();
             else
-               Board_ledOff(LED_GREEN0+LED_YELLOW+LED_RED);
-         }
+               Board_ledOff(LED_GREEN0+LED_YELLOW+LED_RED); // This needs to be to Keep the LED in Position A as off.
+         } */
 
          // DMP related - Change normal LED operation if MPL is calibrating
          if(!mplCalibrating){
@@ -1687,26 +1709,38 @@ __interrupt void TIMER0_B1_ISR(void)
                else{
                   if(!sensing){                       //standby or configuring
                      if(initializing || configuring){ //configuring
-                        if(!(P1OUT & BIT1))
+                        if((blinkCnt5<2) && (blinkTimes < 6))
+                        {
                            Board_ledOn(LED_GREEN1);
-                        else
+                           blinkTimes++;
+                        }
+					   else
                            Board_ledOff(LED_GREEN1);
                      }
-                     else{                            //standby
-                        if(!blinkCnt20)
+                     else if(YellowBlink<6)
+                     {
+                         if(YellowBlink % 2 == 0)
+                        	 Board_ledOff(LED_GREEN1);
+                         else
+                        	 Board_ledOn(LED_GREEN1);
+                     }
+
+                     else{                            //standby Do Nothing
+                        /*if(!blinkCnt20)
                            Board_ledOn(LED_GREEN1);
-                        else
+                        else */
                            Board_ledOff(LED_GREEN1);
+
                      }
                   }else{                              //sensing
-                     if(blinkCnt20<10)
-                        Board_ledOn(LED_GREEN1);
+                     if(blinkCnt100<2)
+                        Board_ledOn(LED_BLUE);
                      else
-                        Board_ledOff(LED_GREEN1);
+                        Board_ledOff(LED_BLUE);
                   }
                }
                // good file - blue:
-               if(btPowerOn){
+              /* if(btPowerOn){
                   if(!btIsConnected)
                      Board_ledOn(LED_BLUE);
                   else
@@ -1727,10 +1761,10 @@ __interrupt void TIMER0_B1_ISR(void)
                   }
                   else
                      Board_ledOff(LED_BLUE);
-               }
+               } */
             }
          }
-         else{
+         else{					// We are calibrating the MPL
             if(mplCalibratingMag) {
                Board_ledOn(LED_BLUE);
             }
@@ -1738,6 +1772,8 @@ __interrupt void TIMER0_B1_ISR(void)
                Board_ledToggle(LED_BLUE);
             }
          }
+
+
       }
       break;
    case  8: break;                          // TB0CCR4
