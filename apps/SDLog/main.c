@@ -1138,12 +1138,10 @@ __interrupt void Port1_ISR(void)
               P1IES &= ~BIT6;
                // call calibrate function 3s after button button pressed - a check is performed inside MPU_calibrate_cb to see if button is still pressed
                // only allow calibration when not docked and not sensing
-              if(!sensing && !docked && (storedConfig[NV_CONFIG_SETUP_BYTE4]&MPU9150_MPL_DMP) && !(taskList&TASK_STARTSENSING) && !mplCalibrating && !mplCalibrateInit){
-                 mplCalibrateInit = 1;
-                 msp430_register_timer_cb(MPL_calibrateCB, 3300);//, 0);
+              if(!docked ){
+                 //mplCalibrateInit = 1;
+                 msp430_register_timer_cb(MPL_calibrateCB, 2300);//, 0);
               }
-              else
-                 mplCalibrateInit = 0;
            }
            else{//button released
               P1IES |= BIT6;
@@ -1156,13 +1154,12 @@ __interrupt void Port1_ISR(void)
 #if !TESTDOCK
                  if(!mplCalibrating) {
                     if(storedConfig[NV_SD_TRIAL_CONFIG0] & SDH_USER_BUTTON_ENABLE){
-                       if(sensing){
-                          TaskSet(TASK_STOPSENSING);
-                       }
-                       else if (!docked){
-                          if(TaskSet(TASK_STARTSENSING))
-                             __bic_SR_register_on_exit(LPM3_bits);
-                       }
+                       /* This part of the code sets the task to sensing or stop sensing */
+                       /* Change it to do things on single tap */
+                    	if(sensing) /* We want the marker to be used only if sensing is on */
+                    	{
+
+                    	}
                     }
                  }
                  else
@@ -5280,7 +5277,16 @@ void SetBtBaudRate(uint8_t rate) {
 
 // DMP related - start
 uint8_t MPL_calibrateCB(void){
-   return TaskSet(TASK_MPL_CALIBRATE);
+
+/*   return TaskSet(TASK_MPL_CALIBRATE);*/
+	if(sensing && (!(P1IN & BIT6))){
+	  return TaskSet(TASK_STOPSENSING);
+	}
+	else if (!docked && (!(P1IN & BIT6))){
+	  return (TaskSet(TASK_STARTSENSING));
+
+
+	}
 }
 
 void MPL_calibrateGo(void)
