@@ -296,6 +296,7 @@ void main(void) {
             RcStart();
          }
          configuring = 0;
+
       }
       if(taskCurrent == TASK_SAMPLEMPU9150MAG){
          if(!(storedConfig[NV_CONFIG_SETUP_BYTE4] & MPU9150_MPL_DMP))
@@ -1712,10 +1713,21 @@ __interrupt void TIMER0_B1_ISR(void)
                         if((blinkCnt5<2) && (blinkTimes < 6))
                         {
                            Board_ledOn(LED_GREEN1);
+                           Board_ledOff(LED_BLUE);
                            blinkTimes++;
                         }
+                        else if((blinkCnt5<2) && (blinkTimes < 9) && (blinkTimes >5) )
+                        {
+                            Board_ledOn(LED_BLUE);
+                            Board_ledOff(LED_GREEN1);
+                            blinkTimes++;
+                        }
 					   else
-                           Board_ledOff(LED_GREEN1);
+					   {
+						   Board_ledOff(LED_GREEN1);
+						   Board_ledOff(LED_BLUE);
+					   }
+
                      }
                      else if(YellowBlink<6)
                      {
