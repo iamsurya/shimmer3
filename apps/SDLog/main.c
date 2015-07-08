@@ -239,6 +239,10 @@ float clockFreq;
 
 uint8_t blinkTimes = 0;
 uint8_t YellowBlink = 0;
+uint16_t ADC_val = 0; // This is our marker. Formula for converting this to Calibrated units is (1/((B2*Adcval)+C2)*1000) where B2  = 0.0373, C2 = -24.9915
+
+
+
 
 void main(void) {
    // first/second MPL library callback fails if system_pre_init.c is used
@@ -1140,7 +1144,7 @@ __interrupt void Port1_ISR(void)
                // only allow calibration when not docked and not sensing
               if(!docked ){
                  //mplCalibrateInit = 1;
-                 msp430_register_timer_cb(MPL_calibrateCB, 2300);//, 0);
+                 msp430_register_timer_cb(MPL_calibrateCB, 2500);//, 0);
               }
            }
            else{//button released
@@ -1158,7 +1162,8 @@ __interrupt void Port1_ISR(void)
                        /* Change it to do things on single tap */
                     	if(sensing) /* We want the marker to be used only if sensing is on */
                     	{
-
+                    		ADC_val = 938; // Gives a calibrated GSR value of 100.041 in the excel file
+                            Board_ledOn(LED_RED);
                     	}
                     }
                  }
@@ -1771,6 +1776,7 @@ __interrupt void TIMER0_B1_ISR(void)
                   else
                      Board_ledOff(LED_BLUE);
                } */
+               Board_ledOff(LED_RED);
             }
          }
          else{					// We are calibrating the MPL
@@ -4374,31 +4380,20 @@ void GsrRange() {
    // If during resistor transition period use old ADC and resistor values
    // as determined by GSR_smoothTransition()
 
-   uint8_t current_active_resistor = gsrActiveResistor;
-   uint16_t ADC_val;
+   //uint8_t current_active_resistor = gsrActiveResistor;
+   // uint16_t ADC_val;
 
    // GSR channel will always be last ADC channel
    if(currentBuffer == 0) {
-      ADC_val = *((uint16_t *)txBuff0 + (nbrAdcChans - 1 - 0) + 2);// - self - vbatt + dummy + ts
-      if(((storedConfig[NV_CONFIG_SETUP_BYTE3]&0x0E)>>1) == GSR_AUTORANGE) {
-         if(GSR_smoothTransition(&current_active_resistor, *(uint16_t *)(storedConfig+NV_SAMPLING_RATE))) {
-            ADC_val = lastGsrVal;
-         }else
-            gsrActiveResistor = GSR_controlRange(ADC_val, gsrActiveResistor);
-      }
-      *((uint16_t *)txBuff0 + (nbrAdcChans - 1 - 0) + 2) =  ADC_val | (current_active_resistor << 14);
+
+      *((uint16_t *)txBuff0 + (nbrAdcChans - 1 - 0) + 2) =  ADC_val;
    }
    else {
-      ADC_val = *((uint16_t *)txBuff1 + (nbrAdcChans - 1 - 0) + 2);
-      if(((storedConfig[NV_CONFIG_SETUP_BYTE3]&0x0E)>>1) == GSR_AUTORANGE) {
-         if(GSR_smoothTransition(&current_active_resistor, *(uint16_t *)(storedConfig+NV_SAMPLING_RATE))) {
-            ADC_val = lastGsrVal;
-         }else
-            gsrActiveResistor = GSR_controlRange(ADC_val, gsrActiveResistor);
-      }
-      *((uint16_t *)txBuff1 + (nbrAdcChans - 1 - 0) + 2) =  ADC_val | (current_active_resistor << 14);
+
+      *((uint16_t *)txBuff1 + (nbrAdcChans - 1 - 0) + 2) =  ADC_val;
    }
-   lastGsrVal = ADC_val;
+   //lastGsrVal = ADC_val;
+   ADC_val = 0;
 }
 
 void ItoaWith0(uint64_t num, uint8_t* buf, uint8_t len){// len = actual len + 1 extra '\0' at the end
