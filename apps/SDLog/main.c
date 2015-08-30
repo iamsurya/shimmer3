@@ -237,7 +237,7 @@ float clockFreq;
 
 #define TESTDOCK 0
 
-uint8_t blinkTimes = 0;
+uint8_t blinkTimes = 0, rBlinkTimes = 0;
 uint8_t YellowBlink = 0;
 uint16_t ADC_val = 0; // This is our marker. Formula for converting this to Calibrated units is (1/((B2*Adcval)+C2)*1000) where B2  = 0.0373, C2 = -24.9915
 
@@ -1144,7 +1144,7 @@ __interrupt void Port1_ISR(void)
                // only allow calibration when not docked and not sensing
               if(!docked ){
                  //mplCalibrateInit = 1;
-                 msp430_register_timer_cb(MPL_calibrateCB, 2500);//, 0);
+                 msp430_register_timer_cb(MPL_calibrateCB, 3000);//, 0);
               }
            }
            else{//button released
@@ -1163,7 +1163,7 @@ __interrupt void Port1_ISR(void)
                     	if(sensing) /* We want the marker to be used only if sensing is on */
                     	{
                     		ADC_val = 938; // Gives a calibrated GSR value of 100.041 in the excel file
-                            Board_ledOn(LED_RED);
+                            rBlinkTimes = 0;
                     	}
                     }
                  }
@@ -1665,7 +1665,7 @@ __interrupt void TIMER0_B1_ISR(void)
       if(blinkCnt5++==4)
          blinkCnt5 = 0;
 
-      if(YellowBlink<6) YellowBlink++;
+      if(YellowBlink<31) YellowBlink++;
 
 
 
@@ -1712,7 +1712,7 @@ __interrupt void TIMER0_B1_ISR(void)
                else{
                   if(!sensing){                       //standby or configuring
                      if(initializing || configuring){ //configuring
-                        if((blinkCnt5<2) && (blinkTimes < 6))
+                        /* if((blinkCnt5<2) && (blinkTimes < 6))
                         {
                            Board_ledOn(LED_GREEN1);
                            Board_ledOff(LED_BLUE);
@@ -1723,19 +1723,28 @@ __interrupt void TIMER0_B1_ISR(void)
                             Board_ledOn(LED_BLUE);
                             Board_ledOff(LED_GREEN1);
                             blinkTimes++;
-                        }
+                        }*/
+                    	 if(blinkTimes<30)
+                    	 {
+                    		 Board_ledOn(LED_GREEN1);
+                    		 blinkTimes++;
+
+                    	 }
 					   else
 					   {
 						   Board_ledOff(LED_GREEN1);
 						   Board_ledOff(LED_BLUE);
 					   }
 
+                    	 rBlinkTimes = 10;
+                    	 blinkCnt100 = 2;
+
                      }
-                     else if(YellowBlink<6)
+                     else if(YellowBlink<10)
                      {
-                         if(YellowBlink % 2 == 0)
+                       /*  if(YellowBlink % 2 == 0)
                         	 Board_ledOff(LED_GREEN1);
-                         else
+                         else */
                         	 Board_ledOn(LED_GREEN1);
                      }
 
@@ -1751,6 +1760,16 @@ __interrupt void TIMER0_B1_ISR(void)
                         Board_ledOn(LED_BLUE);
                      else
                         Board_ledOff(LED_BLUE);
+
+                     if(rBlinkTimes<10)
+                     {
+                    	 Board_ledOn(LED_RED);
+                    	 rBlinkTimes++;
+                     }
+                     else
+                     {
+                    	 Board_ledOff(LED_RED);
+                     }
                   }
                }
                // good file - blue:
@@ -1776,7 +1795,7 @@ __interrupt void TIMER0_B1_ISR(void)
                   else
                      Board_ledOff(LED_BLUE);
                } */
-               Board_ledOff(LED_RED);
+               //Board_ledOff(LED_RED);
             }
          }
          else{					// We are calibrating the MPL
